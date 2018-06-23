@@ -158,7 +158,7 @@ def go(options):
     ## Create callback to generate some samples after each epoch
 
     def generate(epoch):
-        if epoch % options.output_every == 0:
+        if epoch % options.out_every == 0:
             for i in range(CHECK):
                 b = random.randint(0, n - 1)
 
