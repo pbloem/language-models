@@ -14,8 +14,6 @@ import util
 
 INDEX_FROM = 3
 CHECK = 5
-DIR = os.path.dirname(os.path.realpath(__file__))
-
 
 def generate_seq(
         model : Model,
@@ -62,13 +60,20 @@ def generate_seq(
 
 def go(options):
 
+    if options.seed < 0:
+        seed = random.randint(0, 1000000)
+        print('random seed: ', seed)
+        np.random.seed(seed)
+    else:
+        np.random.seed(options.seed)
+
 
     ## Load the data
     if options.task == 'alice':
 
         dir = options.data_dir
         x, char_to_ix, ix_to_char = \
-            util.load_characters(DIR + '/datasets/alice.txt', limit=options.limit, length=options.sequence_length)
+            util.load_characters(util.DIR + '/datasets/alice.txt', limit=options.limit, length=options.sequence_length)
 
         x_max_len = max([len(sentence) for sentence in x])
         numchars = len(ix_to_char)
@@ -80,7 +85,7 @@ def go(options):
 
         dir = options.data_dir
         x, char_to_ix, ix_to_char = \
-            util.load_characters(DIR + '/datasets/shakespeare.txt', limit=options.limit, length=options.sequence_length)
+            util.load_characters(util.DIR + '/datasets/shakespeare.txt', limit=options.limit, length=options.sequence_length)
 
         x_max_len = max([len(sentence) for sentence in x])
         numchars = len(ix_to_char)
@@ -225,6 +230,11 @@ if __name__ == "__main__":
                         dest="limit",
                         help="Character cap for the corpus",
                         default=None, type=int)
+
+    parser.add_argument("-r", "--random-seed",
+                        dest="seed",
+                        help="RNG seed. Negative for random (seed is printed for reproducability).)",
+                        default=-1, type=int)
 
     parser.add_argument("-x", "--extra-layers",
                         dest="extra",

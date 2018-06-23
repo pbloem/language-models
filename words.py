@@ -54,11 +54,6 @@ def sparse_loss(y_true, y_pred):
     return K.sparse_categorical_crossentropy(y_true, y_pred, from_logits=True)
 
 def go(options):
-    slength = options.max_length
-    top_words = options.top_words
-    lstm_hidden = options.lstm_capacity
-
-    print('devices', device_lib.list_local_devices())
 
     tbw = SummaryWriter(log_dir=options.tb_dir)
 
@@ -69,88 +64,59 @@ def go(options):
     else:
         np.random.seed(options.seed)
 
-    if options.task == 'file':
+    if options.task == 'wikisimple':
 
-        dir = options.data_dir
-        x, x_vocab_len, x_word_to_ix, x_ix_to_word = \
-            util.load_sentences(options.data_dir, vocab_size=top_words, limit=options.limit)
-
-        # Finding the length of the longest sequence
-        x_max_len = max([len(sentence) for sentence in x])
-
-        print('max sequence length ', x_max_len)
-        print(len(x_ix_to_word), 'distinct words')
-
-        x = util.batch_pad(x, options.batch)
-
-        def decode(seq):
-            return ' '.join(x_ix_to_word[id] for id in seq)
-
-    elif options.task == 'europarl':
-
-        dir = options.data_dir
-        x, x_vocab_len, x_word_to_ix, x_ix_to_word, _, _, _, _ = \
-            util.load_data(dir+os.sep+'europarl-v8.fi-en.en', dir+os.sep+'europarl-v8.fi-en.fi', vocab_size=top_words, limit=options.limit)
+        x, w21, i2w = \
+            util.load_words(util.DIR + '/datasets/wikisimple.txt', vocab_size=options.top_words, limit=options.limit)
 
         # Finding the length of the longest sequence
         x_max_len = max([len(sentence) for sentence in x])
 
+        numwords = len(i2w)
         print('max sequence length ', x_max_len)
-        print(len(x_ix_to_word), 'distinct words')
+        print(numwords, 'distinct words')
 
-        x = util.batch_pad(x, options.batch)
+        x = util.batch_pad(x, options.batch, add_eos=True)
 
-        def decode(seq):
-            return ' '.join(x_ix_to_word[id] for id in seq)
+    elif options.task == 'file':
 
-    elif options.task == 'imdb':
-        # Load only training sequences
-        (x, _), _ = imdb.load_data(num_words=top_words)
+        x, w21, i2w = \
+            util.load_words(options.data_dir, vocab_size=options.top_words, limit=options.limit)
 
-        # rm start symbol
-        x = [l[1:] for l in x]
+        # Finding the length of the longest sequence
+        x_max_len = max([len(sentence) for sentence in x])
 
-        # x = sequence.pad_sequences(x, maxlen=slength+1, padding='post', truncating='post')
-        # x = x[:, 1:] # rm start symbol
+        numwords = len(i2w)
+        print('max sequence length ', x_max_len)
+        print(numwords, 'distinct words')
 
-        x = util.batch_pad(x, options.batch)
+        x = util.batch_pad(x, options.batch, add_eos=True)
 
-        word_to_id = keras.datasets.imdb.get_word_index()
-        word_to_id = {k: (v + INDEX_FROM) for k, v in word_to_id.items()}
-        word_to_id["<PAD>"] = 0
-        word_to_id["<START>"] = 1
-        word_to_id["<UNK>"] = 2
-        word_to_id["???"] = 3
-
-        id_to_word = {value: key for key, value in word_to_id.items()}
-
-        def decode(seq):
-            return ' '.join(id_to_word[id] for id in seq)
     else:
         raise Exception('Task {} not recognized.'.format(options.task))
+
+    def decode(seq):
+        return ' '.join(i2w[id] for id in seq)
 
     print('Data Loaded.')
 
     print(sum([b.shape[0] for b in x]), ' sentences loaded')
 
-    # for i in range(3):
-    #     print(x[i, :])
-    #     print(decode(x[i, :]))
-
     ## Define model
+
     input = Input(shape=(None, ))
-    embedding = Embedding(top_words, lstm_hidden, input_length=None)
+    embedding = Embedding(numwords, options.lstm_capacity, input_length=None)
 
     embedded = embedding(input)
 
-    decoder_lstm = LSTM(lstm_hidden, return_sequences=True)
+    decoder_lstm = LSTM(options.lstm_capacity, return_sequences=True)
     h = decoder_lstm(embedded)
 
     if options.extra is not None:
         for _ in range(options.extra):
-            h = LSTM(lstm_hidden, return_sequences=True)(h)
+            h = LSTM(options.lstm_capacity, return_sequences=True)(h)
 
-    fromhidden = Dense(top_words, activation='linear')
+    fromhidden = Dense(numwords, activation='linear')
     out = TimeDistributed(fromhidden)(h)
 
     model = Model(input, out)
@@ -202,7 +168,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--epochs",
                         dest="epochs",
                         help="Number of epochs.",
-                        default=150, type=int)
+                        default=20, type=int)
 
     parser.add_argument("-E", "--embedding-size",
                         dest="embedding_size",
@@ -217,7 +183,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--learn-rate",
                         dest="lr",
                         help="Learning rate",
-                        default=0.00001, type=float)
+                        default=0.001, type=float)
 
     parser.add_argument("-b", "--batch-size",
                         dest="batch",
@@ -227,11 +193,11 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--task",
                         dest="task",
                         help="Task",
-                        default='imdb', type=str)
+                        default='wikisimple', type=str)
 
     parser.add_argument("-D", "--data-directory",
-                        dest="data_dir",
-                        help="Data directory",
+                        dest="data",
+                        help="Data file. Should contain one sentence per line.",
                         default='./data', type=str)
 
     parser.add_argument("-L", "--lstm-hidden-size",
@@ -257,16 +223,16 @@ if __name__ == "__main__":
     parser.add_argument("-T", "--tb-directory",
                         dest="tb_dir",
                         help="Tensorboard directory",
-                        default='./runs/lm', type=str)
+                        default='./runs/words', type=str)
 
     parser.add_argument("-r", "--random-seed",
                         dest="seed",
-                        help="RNG seed. Negative for random",
-                        default=1, type=int)
+                        help="RNG seed. Negative for random (seed is printed for reproducability).",
+                        default=-1, type=int)
 
     parser.add_argument("-x", "--extra-layers",
                         dest="extra",
-                        help="Number of extra LSTM layers",
+                        help="Number of extra LSTM layers.",
                         default=None, type=int)
 
     options = parser.parse_args()

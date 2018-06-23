@@ -12,6 +12,8 @@ from scipy.misc import logsumexp
 
 from collections import defaultdict, Counter, OrderedDict
 
+import os
+
 """
 Various utility functions for loading data and performing other common operations.
 
@@ -21,6 +23,7 @@ Some of this code is based on Based on https://github.com/ChunML/seq2seq/blob/ma
 
 # Special tokens
 EXTRA_SYMBOLS = ['<PAD>', '<START>', '<UNK>', '<EOS>']
+DIR = os.path.dirname(os.path.realpath(__file__))
 
 def load_words(source, vocab_size=10000, limit=None, max_length=None):
     """
