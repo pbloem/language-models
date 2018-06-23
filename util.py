@@ -129,7 +129,7 @@ def load_characters(source, length=None, limit=None,):
             else:
                 x[i][j] = c2i['<UNK>']
 
-    return x, len(i2c), c2i, i2c
+    return x, c2i, i2c
 
 def process_data(word_sentences, max_len, word_to_ix):
     # Vectorizing each element in each sequence

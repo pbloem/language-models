@@ -44,15 +44,16 @@ def generate_seq(
 
     ls = seed.shape[0]
 
-    # Due to the way Keras RNNs work, we feed the model the whole sequence each time. At first it's just the seed,
-    # padded to the right length. With each iteration we sample and set the next character.
+    # Due to the way Keras RNNs work, we feed the model a complete sequence each time. At first it's just the seed,
+    # zero-padded to the right length. With each iteration we sample and set the next character.
 
     tokens = np.concatenate([seed, np.zeros(size - ls)])
 
+    # convert the integer sequence to a categorical one
+    toh = util.to_categorical(tokens[None, :], numchars)
+
     for i in range(ls, size-1):
 
-        # convert the integer sequence to a categorical one
-        toh = util.to_categorical(tokens[None,:], numchars)
         # predict next characters (for the whole sequence)
         probs = model.predict(toh)
 
@@ -61,15 +62,21 @@ def generate_seq(
 
         tokens[i+1] = next_token
 
+        # update the one-hot encoding
+        toh[0, i+1, 0] = 0
+        toh[0, i+1, next_token] = 1
+
     return [int(t) for t in tokens]
 
 def go(options):
 
-    if options.task == 'shakespeare':
+
+    ## Load the data
+    if options.task == 'alice':
 
         dir = options.data_dir
         x, char_to_ix, ix_to_char = \
-            util.load_char_data('./datasets/shakespeare.txt', limit=options.limit, length=options.sequence_length)
+            util.load_characters('./datasets/alice.txt', limit=options.limit, length=options.sequence_length)
 
         x_max_len = max([len(sentence) for sentence in x])
         numchars = len(ix_to_char)
@@ -77,14 +84,11 @@ def go(options):
 
         x = sequence.pad_sequences(x, x_max_len, padding='post', truncating='post')
 
-        def decode(seq):
-            return ''.join(ix_to_char[id] for id in seq)
-
-    if options.task == 'file':
+    elif options.task == 'shakespeare':
 
         dir = options.data_dir
         x, char_to_ix, ix_to_char = \
-            util.load_char_data(options.da, limit=options.limit, length=options.sequence_length)
+            util.load_characters('./datasets/shakespeare.txt', limit=options.limit, length=options.sequence_length)
 
         x_max_len = max([len(sentence) for sentence in x])
         numchars = len(ix_to_char)
@@ -92,16 +96,43 @@ def go(options):
 
         x = sequence.pad_sequences(x, x_max_len, padding='post', truncating='post')
 
-        def decode(seq):
-            return ''.join(ix_to_char[id] for id in seq)
+    elif options.task == 'file':
+
+        dir = options.data_dir
+        x, char_to_ix, ix_to_char = \
+            util.load_characters(options.da, limit=options.limit, length=options.sequence_length)
+
+        x_max_len = max([len(sentence) for sentence in x])
+        numchars = len(ix_to_char)
+        print(numchars, ' distinct characters found')
+
+        x = sequence.pad_sequences(x, x_max_len, padding='post', truncating='post')
 
     else:
-        raise Exception('Dataset name not recognized.')
+        raise Exception('Dataset name ({}) not recognized.'.format(options.task))
+
+    def decode(seq):
+        return ''.join(ix_to_char[id] for id in seq)
 
     print('Data Loaded.')
 
-    ## Define model
+    ## Shape the data. The inputs get a start symbol (1) prepended. We shorten the sequences by one so that the lengths
+    #  match
+    n = x.shape[0]
+
+    x_in  = np.concatenate([np.ones((n, 1)), x[:, :-1]], axis=1)  # prepend start symbol
+    x_out = x
+    assert x_in.shape == x_out.shape
+
+    #  convert from integer sequences to sequences of one-hot vectors
+    x_in = util.to_categorical(x_in, numchars)
+    x_out = util.to_categorical(x_out, numchars)  # output to one-hots
+
+    ## Define the model
+
     input = Input(shape=(None, numchars))
+    #- We define the model as variable-length (even though all training data has fixed length). This allows us to generate
+    #  longer sequences during inference.
 
     h = LSTM(options.lstm_capacity, return_sequences=True)(input)
 
@@ -109,6 +140,7 @@ def go(options):
         for _ in range(options.extra):
             h = LSTM(options.lstm_capacity, return_sequences=True)(h)
 
+    #  Apply a single dense layer to all timesteps of the resulting sequence to convert back to characters
     out = TimeDistributed(Dense(numchars, activation='softmax'))(h)
 
     model = Model(input, out)
@@ -116,33 +148,31 @@ def go(options):
     opt = keras.optimizers.Adam(lr=options.lr)
 
     model.compile(opt, 'categorical_crossentropy')
+    #- For each timestep the model outputs a probability distribution over all characters. Categorical crossentopy mean
+    #  that we try to optimize the log-probability of the probability of the correct character (averaged over all
+    #  characters in all sequences.
+
     model.summary()
 
-    n = x.shape[0]
+    ## Create callback to generate some samples after each epoch
 
-    x_shifted = np.concatenate([np.ones((n, 1)), x], axis=1)  # prepend start symbol
-    x_shifted = util.to_categorical(x_shifted, numchars)
+    def generate(epoch):
+        if epoch % options.output_every == 0:
+            for i in range(CHECK):
+                b = random.randint(0, n - 1)
 
-    x_out = np.concatenate([x, np.zeros((n, 1))], axis=1)  # append pad symbol
-    x_out = util.to_categorical(x_out, numchars)  # output to one-hots
+                seed = x[b, :20]
+                seed = np.insert(seed, 0, 1)
+                gen = generate_seq(model, seed, numchars, options.gen_length)
 
-    ## Create callback to generate some sample after each epoch
-    def generate():
-        for i in range(CHECK):
-            b = random.randint(0, n - 1)
-
-            seed = x[b, :20]
-            seed = np.insert(seed, 0, 1)
-            gen = generate_seq(model, seed, numchars, options.gen_length)
-
-            print('*** [', decode(seed), '] ', decode(gen[len(seed):]))
-            print()
+                print('*** [', decode(seed), '] ', decode(gen[len(seed):]))
+                print()
 
     # Train the model
     generate_stuff = keras.callbacks.LambdaCallback(
-        on_epoch_end=lambda epoch, logs: generate())
+        on_epoch_end=lambda epoch, logs: generate(epoch))
 
-    model.fit(x_shifted, x_out, epochs=options.epochs, batch_size=64, callbacks=[generate_stuff])
+    model.fit(x_in, x_out, epochs=options.epochs, batch_size=options.batch, callbacks=[generate_stuff])
 
 if __name__ == "__main__":
 
@@ -162,7 +192,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output-every",
                         dest="out_every",
                         help="Output every n epochs.",
-                        default=1, type=int)
+                        default=5, type=int)
 
     parser.add_argument("-l", "--learn-rate",
                         dest="lr",
@@ -176,12 +206,12 @@ if __name__ == "__main__":
 
     parser.add_argument("-t", "--task",
                         dest="task",
-                        help="Task",
-                        default='shakespeare', type=str)
+                        help="Task. Either 'shakespeare', 'alice' or 'file' (a custom text file specified with -D).",
+                        default='alice', type=str)
 
     parser.add_argument("-D", "--data",
                         dest="data_dir",
-                        help="Data file",
+                        help="Data file. Make sure to use '-t file'.",
                         default=None, type=str)
 
     parser.add_argument("-L", "--lstm-hidden-size",
@@ -194,11 +224,10 @@ if __name__ == "__main__":
                         help="Sequence length",
                         default=None, type=int)
 
-
     parser.add_argument("-g", "--gen_length",
                         dest="gen_length",
                         help="How many characted to generate for each sample",
-                        default=400, type=int)
+                        default=100, type=int)
 
     parser.add_argument("-I", "--limit",
                         dest="limit",

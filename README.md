@@ -31,9 +31,15 @@ We train the model by asking it predi t the next word in the sentence. This is e
 
 To generate sequences, we start from a _seed_: a sequence of a few characters taken from the corpus. We feed these to the RNN and ask it to predict the next character, in the form of a probability distribution over all characters. We sample a character from this distribution, add it to the seed, and repeat.
 
-## example output
+## Further notes
 
-With the standard 
+* The default corpus is Alice in wonderland. This takes about 4 minutes per epoch on my laptop with no GPU. The collected works of shakespeare (```-t shakespeare``) take a little over one hour without a GPU.
+
+With the standard settings, I get the following samples after <> epochs:
+ 
+ <pre>
+ 
+ </pre>
 
 # Model 2: Word level RNN language model
 
