@@ -1,16 +1,11 @@
 from keras.preprocessing.text import text_to_word_sequence
-from keras.models import Sequential
-from keras.layers import Activation, TimeDistributed, Dense, RepeatVector, recurrent, Embedding, Input, Layer
-from keras.layers.recurrent import LSTM
-from keras.optimizers import Adam, RMSprop
-from keras.utils import to_categorical
+from keras.layers import Layer
 import keras.utils
 import keras.backend as K
 
 from nltk import FreqDist
 import numpy as np
-import os, sys
-import datetime
+
 from keras.preprocessing import sequence
 
 from scipy.misc import logsumexp
@@ -211,6 +206,10 @@ def sample(preds, temperature=1.0):
     """
 
     preds = np.asarray(preds).astype('float64')
+
+    if temperature == 0.0:
+        return np.argmax(preds)
+
     preds = np.log(preds) / temperature
 
     exp_preds = np.exp(preds)
@@ -222,7 +221,7 @@ def sample(preds, temperature=1.0):
 
 def sample_logits(preds, temperature=1.0):
     """
-    Sample an index from a logit vector
+    Sample an index from a logit vector.
 
     :param preds:
     :param temperature:

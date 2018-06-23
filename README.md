@@ -33,8 +33,10 @@ To generate sequences, we start from a _seed_: a sequence of a few characters ta
 
 ## Further notes
 
-* The default corpus is Alice in wonderland. This takes about 4 minutes per epoch on my laptop with no GPU. The collected works of shakespeare (```-t shakespeare``) take a little over one hour without a GPU.
-
+* The default corpus is Alice in wonderland. This takes about 4 minutes per epoch on my laptop with no GPU. The collected works of shakespeare (```-t shakespeare``) take a little over one hour on a CPU.
+* With a high-end (TitanX) GPU, ```alice``` takes about 30 seconds per epoch and ```shakespeare``` takes about 30 minutes with default settings. 
+*If you have the memory, increase the sequence length with, for instance, ```-m 1000```, which will reduce the training time per epoch to a little over 10m for ```shakespeare``` and about 30s for ```alice```.
+ 
 With the standard settings, I get the following samples after <> epochs:
  
  <pre>
@@ -70,6 +72,8 @@ For each implementation I got stuck for a long time on several bugs. If you're p
 
 To install all required packages, run the following pip command (let me know if I've forgotten anything):
 
-```pip install numpy keras matplotlib ntlk tensorboardx```
+```pip install numpy keras matplotlib ntlk tensorboardx scipy```
 
-You'll also need tensorflow. If you don't have a gpu, run ```pip install tensorflow```. If you do  ```pip install tensorflow-gpu``` and make sure your [drivers are installed correctly]().
+You'll also need tensorflow. If you don't have a GPU, run ```pip install tensorflow```. If you do, run  ```pip install tensorflow-gpu``` and make sure your [drivers are installed correctly](https://www.tensorflow.org/install/).
+
+I've tried to use keras class only, but I haven't tested whether this works with other backends than tensorflow. If you're testing with another backend, let me know how you get on.  
