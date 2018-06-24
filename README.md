@@ -66,6 +66,11 @@ Variational autoencoders are powerful, but complicated models. To learn more, ch
 * [Tutorial on Variational Autoencoders](https://arxiv.org/abs/1606.05908) by Carl Doersch
 * [Lecture on Variational Autoencoders (and other generative models)](https://www.youtube.com/watch?v=APuP9SkESGA)
 
+# notes
+
+* 
+* If you have the memory, ```-b 1024 -l 1e-2``` is a decent way to train quickly (about 10 seconds per epoch on a TitanX).
+
 # Implementation tips
 
 For each implementation I got stuck for a long time on several bugs. If you're porting/adapting any of these models to another platforms, make sure to check the following.

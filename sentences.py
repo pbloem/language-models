@@ -40,7 +40,7 @@ def anneal(step, total, k = 1.0, anneal_function='linear'):
 def generate_seq(
         model : Model, z,
         size = 60,
-        seed = np.ones(1), temperature=1.0, stop_at_eos=False):
+        seed = np.ones(1), temperature=1.0, stop_at_eos=True):
     """
 
     :param model:
