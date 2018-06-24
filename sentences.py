@@ -195,7 +195,7 @@ def go(options):
     auto.summary()
 
     instances_seen = 0
-    for epoch in range(options.epochs):
+    for epoch in range(options.epochs+1):
 
         klw = anneal(epoch, options.epochs)
         print('EPOCH {:03}: Set KL weight to {}'.format(epoch, klw))
