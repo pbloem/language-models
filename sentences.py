@@ -215,7 +215,7 @@ def go(options):
             tbw.add_scalar('seq2seq/batch-loss', float(loss)/l, instances_seen)
 
 
-        if epoch % options.out_every == 0:
+        if epoch % options.out_every == 0 and epoch > 0:
 
             # show samples for some sentences from random batches
             for i in range(CHECK):
