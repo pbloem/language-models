@@ -98,9 +98,7 @@ def go(options):
     def decode(seq):
         return ' '.join(i2w[id] for id in seq)
 
-    print('Data Loaded.')
-
-    print(sum([b.shape[0] for b in x]), ' sentences loaded')
+    print('Finished data loading. ', sum([b.shape[0] for b in x]), ' sentences loaded')
 
     ## Define model
 
@@ -127,9 +125,14 @@ def go(options):
     model.compile(opt, lss)
     model.summary()
 
-    epochs = 0
+    ## Training
+
+    #- Since we have a variable batch size, we make our own training loop, and train with
+    #  model.train_on_batch(...). It's a little more verbose, but it gives us more control.
+
+    epoch = 0
     instances_seen = 0
-    while epochs < options.epochs:
+    while epoch < options.epochs:
 
         for batch in tqdm(x):
             n, l = batch.shape
@@ -142,10 +145,10 @@ def go(options):
             instances_seen += n
             tbw.add_scalar('lm/batch-loss', float(loss), instances_seen)
 
-        epochs += options.out_every
+        epoch += 1
 
         # Show samples for some sentences from random batches
-        for temp in [0.0, 0.7, 1, 1.3, 1.5]:
+        for temp in [0.0, 0.9, 1, 1.1, 1.2]:
             print('### TEMP ', temp)
             for i in range(CHECK):
                 b = random.choice(x)
@@ -188,7 +191,7 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--batch-size",
                         dest="batch",
                         help="Batch size",
-                        default=32, type=int)
+                        default=128, type=int)
 
     parser.add_argument("-t", "--task",
                         dest="task",

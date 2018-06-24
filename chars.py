@@ -169,7 +169,10 @@ def go(options):
     generate_stuff = keras.callbacks.LambdaCallback(
         on_epoch_end=lambda epoch, logs: generate(epoch))
 
-    model.fit(x_in, x_out, epochs=options.epochs, batch_size=options.batch, callbacks=[generate_stuff])
+    model.fit(x_in, x_out,
+              validation_split=1/10,
+              epochs=options.epochs, batch_size=options.batch,
+              callbacks=[generate_stuff])
 
 if __name__ == "__main__":
 
@@ -223,10 +226,10 @@ if __name__ == "__main__":
 
     parser.add_argument("-g", "--gen_length",
                         dest="gen_length",
-                        help="How many characted to generate for each sample",
+                        help="How many characters to generate for each sample",
                         default=100, type=int)
 
-    parser.add_argument("-I", "--limit",
+    parser.add_argument("-I", "--limit1",
                         dest="limit",
                         help="Character cap for the corpus",
                         default=None, type=int)

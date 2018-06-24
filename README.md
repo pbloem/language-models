@@ -35,7 +35,8 @@ To generate sequences, we start from a _seed_: a sequence of a few characters ta
 
 * The default corpus is Alice in wonderland. This takes about 4 minutes per epoch on my laptop with no GPU. The collected works of shakespeare (```-t shakespeare``) take a little over one hour on a CPU.
 * With a high-end (TitanX) GPU, ```alice``` takes about 30 seconds per epoch and ```shakespeare``` takes about 30 minutes with default settings. 
-*If you have the memory, increase the sequence length with, for instance, ```-m 1000```, which will reduce the training time per epoch to a little over 10m for ```shakespeare``` and about 30s for ```alice```.
+* If you have the memory, increase the sequence length with, for instance, ```-m 1000```, which will reduce the training time per epoch to a little over 10m for ```shakespeare``` and about 30s for ```alice```.
+* Training a good character level model can take a long time. For a big corpus , you should expect a couple of days training time, even with a GPU.
  
 With the standard settings, I get the following samples after <> epochs:
  
@@ -46,6 +47,10 @@ With the standard settings, I get the following samples after <> epochs:
 # Model 2: Word level RNN language model
 
 This is basically the same as the previous model, but instead of treating language as a sequence of characters, we treat it as a sequence of _words_. This means we can use a much simpler RNN (one layer will be enough), but it also means that the dimension of the input sequence is much bigger. Previously, we had about 100 possible input tokens, and we could simply model text as a sequence of [one-hot vectors]. Since we will have about 10000 different words, it pays to pass them through an _embedding layer_ first. This layer embeds the words into a low dimensional space (300 dimensions in our example), where similar words can end up close to each other. We learn this embedding together with the weights of the RNN.
+
+## notes
+
+* Note that the ```-m``` switch here will actually remove sentences from your corpus (unlike the previous model, where it just controlled how the corpus was cut into chunks).
 
 # Model 3: Sentence VAE
 

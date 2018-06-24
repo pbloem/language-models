@@ -1,59 +1,64 @@
 import keras
 
 import keras.backend as K
-from keras.preprocessing import sequence
 from keras.datasets import imdb
-from keras.models import Sequential, Model
 from keras.layers import \
-    Dense, Activation, Conv2D, MaxPool2D, Dropout, Flatten, Input, Reshape, LSTM, Embedding, RepeatVector,\
-    TimeDistributed, Bidirectional, Concatenate, Lambda, SpatialDropout1D, Softmax, GRU
-from keras.optimizers import Adam
+    Dense, LSTM, Embedding, TimeDistributed, Bidirectional, SpatialDropout1D, GRU, Input
+from keras.models import Model
 from tensorflow.python.client import device_lib
 
 from tensorboardX import SummaryWriter
 
 from keras.utils import multi_gpu_model
 
-import tensorflow as tf
-
-from sklearn import datasets
-
 from tqdm import tqdm
 import math, sys, os, random
 import numpy as np
 
-import matplotlib
-matplotlib.use('Agg')
-
-import matplotlib.pyplot as plt
-
 from argparse import ArgumentParser
-
-from keras.layers import Input, Conv2D, Conv2DTranspose, Dense, Reshape, MaxPooling2D, UpSampling2D, Flatten, Cropping2D
-from keras.models import Model, Sequential
-from keras.engine.topology import Layer
 
 import util
 
-INDEX_FROM = 3
 CHECK = 5
 NINTER = 10
 
 def anneal(step, total, k = 1.0, anneal_function='linear'):
-        if anneal_function == 'logistic':
-            return float(1/(1+np.exp(-k*(step-total/2))))
+    """
+    Compute the annealing schedule for the KL weight.
+    :param step: The current epoch
+    :param total:  The total nr. of epochs
+    :param k: Scaling function for the logistic schedule
+    :param anneal_function: Logistic or linear.
+    :return:
+    """
+    if anneal_function == 'logistic':
+       return float(1/(1+np.exp(-k*(step-total/2))))
 
-        elif anneal_function == 'linear':
-            return min(1, step/(total/2))
+    elif anneal_function == 'linear':
+       return min(1, step/(total/2))
 
 def generate_seq(
         model : Model, z,
         size = 60,
-        lstm_layer = None,
         seed = np.ones(1), temperature=1.0, stop_at_eos=False):
+    """
 
-    # Keras doesn't allow us to easily execute sequence models step by step so we just feed it a zero-sequence multiple
-    # times. At step i, we sample a word w from the predictions at i, and set that as element i+1 in the sequence.
+    :param model:
+    :param z: The latent vector from which to generate
+    :param size:
+    :param lstm_layer:
+    :param seed:
+    :param temperature: This controls how much we follow the probabilities provided by the network. For t=1.0 we just
+        sample directly according to the probabilities. Lower temperatures make the high-probability words more likely
+        (providing more likely, but slightly boring sentences) and higher temperatures make the lower probabilities more
+        likely (resulting is weirder sentences). For temperature=0.0, the generation is _greedy_, i.e. the word with the
+        highest probability is always chosen.
+    :param stop_at_eos: If true anything after the first end-of-sentence symbol is ignored.
+    :return: A list of integers representing a sentence.
+    """
+
+    # Due to the way Keras RNNs work, we feed the model a complete sequence each time. At first it's just the seed,
+    # zero-padded to the right length. With each iteration we sample and set the next character.
 
     ls = seed.shape[0]
     tokens = np.concatenate([seed, np.zeros(size - ls)])
@@ -75,105 +80,57 @@ def generate_seq(
 
     return result
 
-
-def decode_imdb(seq):
-
-    word_to_id = keras.datasets.imdb.get_word_index()
-    word_to_id = {k: (v + INDEX_FROM) for k, v in word_to_id.items()}
-    word_to_id["<PAD>"] = 0
-    word_to_id["<START>"] = 1
-    word_to_id["<UNK>"] = 2
-
-    id_to_word = {value: key for key, value in word_to_id.items()}
-
-    return ' '.join(id_to_word[id] for id in seq)
-
 def sparse_loss(y_true, y_pred):
     losses = K.sparse_categorical_crossentropy(y_true, y_pred, from_logits=True)
-    return K.sum(losses, axis=-1)
+    return K.sum(losses, axis=-1) # Note the sum over timesteps. This is crucial for the VAE
 
 def go(options):
 
-    slength = options.max_length
-    lstm_hidden = options.lstm_capacity
-
-    print('devices', device_lib.list_local_devices())
-
     tbw = SummaryWriter(log_dir=options.tb_dir)
 
-    if options.task == 'file':
+    if options.task == 'wikisimple':
 
-        dir = options.data_dir
-        x, x_vocab_len, x_word_to_ix, x_ix_to_word = \
-            util.load_sentences(options.data_dir, vocab_size=options.top_words)
-
-        if options.clip_length is not None:
-            x = [(sentence if len(sentence) < options.clip_length else sentence[:options.clip_length]) for sentence in x]
+        x, w21, i2w = \
+            util.load_words(util.DIR + '/datasets/wikisimple.txt', vocab_size=options.top_words, limit=options.limit)
 
         # Finding the length of the longest sequence
         x_max_len = max([len(sentence) for sentence in x])
 
+        numwords = len(i2w)
         print('max sequence length ', x_max_len)
-        print(len(x_ix_to_word), 'distinct words')
+        print(numwords, 'distinct words')
 
         x = util.batch_pad(x, options.batch, add_eos=True)
 
-        def decode(seq):
-            return ' '.join(x_ix_to_word[id] for id in seq)
+    elif options.task == 'file':
 
-    elif options.task == 'europarl':
-
-        dir = options.data_dir
-        x, x_vocab_len, x_word_to_ix, x_ix_to_word, _, _, _, _ = \
-            util.load_data(dir+os.sep+'europarl-v8.fi-en.en', dir+os.sep+'europarl-v8.fi-en.fi', vocab_size=options.top_words)
+        x, w21, i2w = \
+            util.load_words(options.data_dir, vocab_size=options.top_words, limit=options.limit)
 
         # Finding the length of the longest sequence
         x_max_len = max([len(sentence) for sentence in x])
 
+        numwords = len(i2w)
         print('max sequence length ', x_max_len)
-        print(len(x_ix_to_word), 'distinct words')
+        print(numwords, 'distinct words')
 
-        x = util.batch_pad(x, options.batch)
-
-        # Padding zeros to make all sequences have a same length with the longest one
-        # x = sequence.pad_sequences(x, maxlen=slength, dtype='int32', padding='post', truncating='post')
-        # y = sequence.pad_sequences(y, maxlen=slength, dtype='int32', padding='post', truncating='post')
-
-        def decode(seq):
-            print(seq)
-            return ' '.join(x_ix_to_word[id] for id in seq)
+        x = util.batch_pad(x, options.batch, add_eos=True)
 
     else:
-        # Load only training sequences
-        (x, _), _ = imdb.load_data(num_words=options.top_words)
+        raise Exception('Task {} not recognized.'.format(options.task))
 
-        # rm start symbol
-        x = [l[1:] for l in x]
+    def decode(seq):
+        return ' '.join(i2w[id] for id in seq)
 
-        # x = sequence.pad_sequences(x, maxlen=slength+1, padding='post', truncating='post')
-        # x = x[:, 1:] # rm start symbol
-
-        x = util.batch_pad(x, options.batch)
-
-        decode = decode_imdb
-
-    print('Data Loaded.')
-
-    print(sum([b.shape[0] for b in x]), ' sentences loaded')
-
-    # for i in range(3):
-    #     print(x[i, :])
-    #     print(decode(x[i, :]))
-
-    num_words = len(x_ix_to_word)
+    print('Finished data loading. ', sum([b.shape[0] for b in x]), ' sentences loaded')
 
     ## Define encoder
     input = Input(shape=(None, ), name='inp')
 
-    embedding = Embedding(num_words, options.embedding_size, input_length=None)
+    embedding = Embedding(numwords, options.embedding_size, input_length=None)
     embedded = embedding(input)
 
-    encoder = LSTM(lstm_hidden) if options.rnn_type == 'lstm' else GRU(lstm_hidden)
+    encoder = LSTM(options.lstm_capacity) if options.rnn_type == 'lstm' else GRU(options.lstm_capacity)
     h = Bidirectional(encoder)(embedded)
 
     tozmean = Dense(options.hidden)
@@ -193,26 +150,22 @@ def go(options):
     zsample = sample([zmean, zlsigma, eps])
 
     ## Define decoder
-    # zsample = Input(shape=(options.hidden,), name='inp-decoder-z')
     input_shifted = Input(shape=(None, ), name='inp-shifted')
 
-    if options.rnn_type == 'lstm':
-        expandz_h = Dense(lstm_hidden, input_shape=(options.hidden,))
-        expandz_c = Dense(lstm_hidden, input_shape=(options.hidden,))
-        z_exp_h = expandz_h(zsample)
-        z_exp_c = expandz_c(zsample)
-        state = [z_exp_h, z_exp_c]
-    else:
-        expandz = Dense(lstm_hidden, input_shape=(options.hidden,))
-        state = expandz(zsample)
+    expandz_h = Dense(options.lstm_capacity, input_shape=(options.hidden,))
+    expandz_c = Dense(options.lstm_capacity, input_shape=(options.hidden,))
+    z_exp_h = expandz_h(zsample)
+    z_exp_c = expandz_c(zsample)
+    state = [z_exp_h, z_exp_c]
+
 
     seq = embedding(input_shifted)
     seq = SpatialDropout1D(rate=options.dropout)(seq)
 
-    decoder_rnn = LSTM(lstm_hidden, return_sequences=True) if options.rnn_type == 'lstm' else GRU(lstm_hidden, return_sequences=True)
+    decoder_rnn = LSTM(options.lstm_capacity, return_sequences=True)
     h = decoder_rnn(seq, initial_state=state)
 
-    towords = TimeDistributed(Dense(num_words))
+    towords = TimeDistributed(Dense(numwords))
     out = towords(h)
 
     auto = Model([input, input_shifted, eps], out)
@@ -228,32 +181,21 @@ def go(options):
     z_in = Input(shape=(options.hidden,))
     s_in = Input(shape=(None,))
     seq = embedding(s_in)
-    if options.rnn_type == 'lstm':
-        z_exp_h = expandz_h(z_in)
-        z_exp_c = expandz_c(z_in)
-        state = [z_exp_h, z_exp_c]
-    else:
-        state = expandz(z_in)
+    z_exp_h = expandz_h(z_in)
+    z_exp_c = expandz_c(z_in)
+    state = [z_exp_h, z_exp_c]
     h = decoder_rnn(seq, initial_state=state)
     out = towords(h)
     decoder = Model([s_in, z_in], out)
 
-    ## Compile the autoencoder model
-    if options.num_gpu is not None:
-        auto = multi_gpu_model(auto, gpus=options.num_gpu)
-
+    ## Compile the autoencoder model for training
     opt = keras.optimizers.Adam(lr=options.lr)
 
     auto.compile(opt, sparse_loss)
     auto.summary()
 
-    epoch = 0
     instances_seen = 0
-
-    # DEBUG
-    # x = x[:20]
-
-    while epoch < options.epochs:
+    for epoch in range(options.epochs):
 
         klw = anneal(epoch, options.epochs)
         print('EPOCH {:03}: Set KL weight to {}'.format(epoch, klw))
@@ -272,7 +214,6 @@ def go(options):
             instances_seen += n
             tbw.add_scalar('seq2seq/batch-loss', float(loss)/l, instances_seen)
 
-        epoch += 1
 
         if epoch % options.out_every == 0:
 
@@ -361,7 +302,7 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--task",
                         dest="task",
                         help="Task",
-                        default='imdb', type=str)
+                        default='wikisimple', type=str)
 
     parser.add_argument("-D", "--data-directory",
                         dest="data_dir",
@@ -388,11 +329,6 @@ if __name__ == "__main__":
                         help="LSTM capacity",
                         default=256, type=int)
 
-    parser.add_argument("-g", "--num-gpu",
-                        dest="num_gpu",
-                        help="How many GPUs to use (Default is 1 if available, You only need to set this if you wish to use more than 1).",
-                        default=None, type=int)
-
     parser.add_argument("-m", "--max_length",
                         dest="max_length",
                         help="Max length",
@@ -403,15 +339,15 @@ if __name__ == "__main__":
                         help="If not None, all sentences longer than this length are clipped to this length.",
                         default=None, type=int)
 
+    parser.add_argument("-I", "--limit",
+                        dest="limit",
+                        help="Character cap for the corpus",
+                        default=None, type=int)
+
     parser.add_argument("-w", "--top_words",
                         dest="top_words",
                         help="Top words",
                         default=10000, type=int)
-    #
-    # parser.add_argument("-S", "--use-state",
-    #                     dest="use_state",
-    #                     help="Use the last hidden (C) state of the encoder LSTM instead of the last output vector.",
-    #                     action='store_true')
 
     options = parser.parse_args()
 
