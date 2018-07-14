@@ -102,6 +102,20 @@ def go(options):
 
         x = util.batch_pad(x, options.batch, add_eos=True)
 
+    if options.task == 'europarl-50':
+
+        x, w21, i2w = \
+            util.load_words(util.DIR + '/datasets/europarl.50.txt', vocab_size=options.top_words, limit=options.limit)
+
+        # Finding the length of the longest sequence
+        x_max_len = max([len(sentence) for sentence in x])
+
+        numwords = len(i2w)
+        print('max sequence length ', x_max_len)
+        print(numwords, 'distinct words')
+
+        x = util.batch_pad(x, options.batch, add_eos=True)
+
     elif options.task == 'file':
 
         x, w21, i2w = \
