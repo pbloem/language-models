@@ -119,7 +119,7 @@ def go(options):
     elif options.task == 'coco':
 
         x, w21, i2w = \
-            util.load_words(util.DIR + '/datasets/coc.valannotations.txt', vocab_size=options.top_words, limit=options.limit)
+            util.load_words(util.DIR + '/datasets/coco.valannotations.txt', vocab_size=options.top_words, limit=options.limit)
 
         # Finding the length of the longest sequence
         x_max_len = max([len(sentence) for sentence in x])
@@ -258,7 +258,7 @@ def go(options):
             tbw.add_scalar('seq2seq/batch-loss', float(loss)/l, instances_seen)
 
 
-        if epoch % options.out_every == 0 and epoch > 0:
+        if epoch % options.out_every == 0:
 
             # show samples for some sentences from random batches
             for i in range(CHECK):
