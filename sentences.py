@@ -196,16 +196,25 @@ def go(options):
     input_shifted = Input(shape=(None, ), name='inp-shifted')
 
     expandz_h = Dense(options.lstm_capacity, input_shape=(options.hidden,))
-    expandz_c = Dense(options.lstm_capacity, input_shape=(options.hidden,))
     z_exp_h = expandz_h(zsample)
-    z_exp_c = expandz_c(zsample)
-    state = [z_exp_h, z_exp_c]
+
+    if options.rnn_type == 'lstm':
+        expandz_c = Dense(options.lstm_capacity, input_shape=(options.hidden,))
+        z_exp_c = expandz_c(zsample)
+
+        state = [z_exp_h, z_exp_c]
+    else:
+        state = z_exp_h
 
 
     seq = embedding(input_shifted)
     seq = SpatialDropout1D(rate=options.dropout)(seq)
 
-    decoder_rnn = LSTM(options.lstm_capacity, return_sequences=True)
+    if options.rnn_type == 'lstm':
+        decoder_rnn = LSTM(options.lstm_capacity, return_sequences=True)
+    else:
+        decoder_rnn = GRU(options.lstm_capacity, return_sequences=True)
+
     h = decoder_rnn(seq, initial_state=state)
 
     towords = TimeDistributed(Dense(numwords))
@@ -225,8 +234,11 @@ def go(options):
     s_in = Input(shape=(None,))
     seq = embedding(s_in)
     z_exp_h = expandz_h(z_in)
-    z_exp_c = expandz_c(z_in)
-    state = [z_exp_h, z_exp_c]
+    if options.rnn_type == 'lstm':
+        z_exp_c = expandz_c(z_in)
+        state = [z_exp_h, z_exp_c]
+    else:
+        state = z_exp_h
     h = decoder_rnn(seq, initial_state=state)
     out = towords(h)
     decoder = Model([s_in, z_in], out)
