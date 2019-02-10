@@ -21,7 +21,7 @@ Add ```-h``` to see the parameters you can change. Make sure you have python 3, 
 
 This is the language model made famous by Anrey Karpathy's blog post [The unreasonable effectiveness of RNNs](http://karpathy.github.io/2015/05/21/rnn-effectiveness/). Here is an image from that post explaining the basic principle.
 
-{image}
+![](http://karpathy.github.io/assets/rnn/charseq.jpeg)
 
 ## training
 
