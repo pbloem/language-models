@@ -64,7 +64,7 @@ To provide long-term structure, we can use a Sentence VAE. This is a model first
 Variational autoencoders are powerful, but complicated models. To learn more, check out the following resources:
 * [Intuitively understanding Variational Autoencoders](https://towardsdatascience.com/intuitively-understanding-variational-autoencoders-1bfe67eb5daf) by Irhum Shafkat
 * [Tutorial on Variational Autoencoders](https://arxiv.org/abs/1606.05908) by Carl Doersch
-* [Lecture on Variational Autoencoders (and other generative models)](https://www.youtube.com/watch?v=APuP9SkESGA)
+* [Lecture on Variational Autoencoders (and other generative models)](https://youtu.be/6N4zIx0ATME)
 
 # notes
 
