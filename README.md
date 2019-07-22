@@ -82,8 +82,8 @@ For each implementation I got stuck for a long time on several bugs. If you're p
 
 To install all required packages, run the following pip command (let me know if I've forgotten anything):
 
-```pip install numpy keras matplotlib ntlk tensorboardx scipy```
+```pip install numpy keras matplotlib nltk tensorboardx scipy```
 
 You'll also need tensorflow. If you don't have a GPU, run ```pip install tensorflow```. If you do, run  ```pip install tensorflow-gpu``` and make sure your [drivers are installed correctly](https://www.tensorflow.org/install/).
 
-I've tried to use keras class only, but I haven't tested whether this works with other backends than tensorflow. If you're testing with another backend, let me know how you get on.  
+I've tried to use keras calls only, and to avoid tensorflow-specific things, but I haven't tested whether this works with other backends than tensorflow. If you're testing with another backend, let me know how you get on.  
