@@ -5,7 +5,7 @@ Each model is implemented and tested and should run out-of-the box. The default 
 
 If you are new to RNNs or language modeling, I recommend checking out the following resources:
 * [Understanding LSTMs](http://colah.github.io/posts/2015-08-Understanding-LSTMs/) by Chris Olah
-* [Lecture on Sequential models](https://www.youtube.com/watch?v=HNOHLvD6_gs&t=1s) 
+* [Lecture on Sequential models](https://youtu.be/h6j9wgHGnOk) 
 
 ## installation
 
@@ -25,7 +25,7 @@ This is the language model made famous by Anrey Karpathy's blog post [The unreas
 
 ## training
 
-We train the model by asking it predi t the next word in the sentence. This is easy to do on an [unrolled]() RNN by shifting the input forward by one token (for instance by prepending a start-of-sentence character) and training it to predict the non-shifted sequence.
+We train the model by asking it to predict the next character in the sentence, given only the preceding characters. This is easy to do on an [unrolled](https://machinelearningmastery.com/rnn-unrolling/) RNN by shifting the input forward by one token (for instance by prepending a start-of-sentence character) and training it to predict the non-shifted sequence.
 
 ## generating
 
@@ -46,7 +46,7 @@ With the standard settings, I get the following samples after <> epochs:
 
 # Model 2: Word level RNN language model
 
-This is basically the same as the previous model, but instead of treating language as a sequence of characters, we treat it as a sequence of _words_. This means we can use a much simpler RNN (one layer will be enough), but it also means that the dimension of the input sequence is much bigger. Previously, we had about 100 possible input tokens, and we could simply model text as a sequence of [one-hot vectors]. Since we will have about 10000 different words, it pays to pass them through an _embedding layer_ first. This layer embeds the words into a low dimensional space (300 dimensions in our example), where similar words can end up close to each other. We learn this embedding together with the weights of the RNN.
+This is basically the same as the previous model, but instead of treating language as a sequence of characters, we treat it as a sequence of _words_. This means we can use a much simpler RNN (one layer will be enough), but it also means that the dimension of the input sequence is much bigger. Previously, we had about 100 possible input tokens, and we could simply model text as a sequence of [one-hot vectors](https://machinelearningmastery.com/why-one-hot-encode-data-in-machine-learning/). Since we will have about 10000 different words, it pays to pass them through an _embedding layer_ first. This layer embeds the words into a low dimensional space (300 dimensions in our example), where similar words can end up close to each other. We learn this embedding together with the weights of the RNN.
 
 ## notes
 
